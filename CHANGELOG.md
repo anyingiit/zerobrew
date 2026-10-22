@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - The Homebrew tap is `zerobrewhq/tap`: `brew install zerobrewhq/tap/zerobrew`. The repository was renamed from `homebrew-zerobrew`, so taps of `zerobrewhq/zerobrew` and `cachebag/zerobrew` keep updating through GitHub's redirect
 
+### Fixed
+- Source builds provide `MacOS`, Homebrew's alias for `OS::Mac`, so formulae that check `MacOS.version`, such as sketchybar, get past it ([#348](https://github.com/zerobrewhq/zerobrew/issues/348))
+- A formula that uses a part of Homebrew's API the build shim doesn't provide fails with the name it needs and the formula line that uses it, instead of a raw Ruby `NameError` or `NoMethodError` with a backtrace through the shim. `-v` still prints the backtrace ([#348](https://github.com/zerobrewhq/zerobrew/issues/348))
+
 ## [0.4.2] - 2026-10-21
 
 ### Added

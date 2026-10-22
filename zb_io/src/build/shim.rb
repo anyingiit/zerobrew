@@ -66,6 +66,9 @@ module OS
   end
 end
 
+# Homebrew's alias for OS::Mac (os/mac.rb), which formulae use as `MacOS.version`.
+MacOS = OS::Mac
+
 class MacOSVersion
   include Comparable
 
@@ -691,7 +694,36 @@ FORMULA_DATA_CONTENT = end_marker_idx ? formula_raw[(formula_raw.index("\n", end
 ENV["HOMEBREW_PREFIX"] = ZEROBREW_PREFIX
 ENV["HOMEBREW_CELLAR"] = ZEROBREW_CELLAR
 
-load FORMULA_FILE
+# A formula that uses a part of Homebrew's API the shim doesn't provide fails
+# with a NameError, or a NoMethodError on the formula or one of the shim's
+# modules. Say which name is missing and where the formula uses it; other
+# errors just say where. The Ruby backtrace is only printed when zb runs
+# verbosely.
+def zerobrew_build_error!(error)
+  location = error.backtrace_locations&.find { |loc| loc.path == FORMULA_FILE }
+  where = location && " (#{File.basename(FORMULA_FILE)}:#{location.lineno})"
+  receiver = begin
+    error.receiver
+  rescue ArgumentError
+    nil
+  end
+  missing_api = error.name &&
+                (!error.is_a?(NoMethodError) || receiver.is_a?(Formula) || receiver.is_a?(Module))
+  if missing_api
+    $stderr.puts "Error: #{FORMULA_NAME} uses `#{error.name}`, which zerobrew can't build from source yet#{where}"
+  else
+    $stderr.puts "Error: #{FORMULA_NAME}'s formula failed#{where}"
+  end
+  $stderr.puts "  #{error.message}"
+  $stderr.puts error.backtrace.map { |line| "    #{line}" } if ENV["ZEROBREW_BACKTRACE"] && error.backtrace
+  exit 1
+end
+
+begin
+  load FORMULA_FILE
+rescue NameError => e
+  zerobrew_build_error!(e)
+end
 
 formula_class = ObjectSpace.each_object(Class).find { |c| c < Formula && c != Formula }
 unless formula_class
@@ -744,5 +776,9 @@ instance = formula_class.new
 
 puts "==> Building #{FORMULA_NAME} #{FORMULA_VERSION}"
 FileUtils.mkdir_p(instance.prefix.to_s)
-instance.install
+begin
+  instance.install
+rescue NameError => e
+  zerobrew_build_error!(e)
+end
 puts "==> Build complete: #{FORMULA_NAME} #{FORMULA_VERSION}"
